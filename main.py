@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
@@ -8,10 +9,25 @@ from app.models.user import User
 from app.models.product import Product
 from app.models.order import Order
 from app.models.order_item import OrderItem
-from app.api.routes.campaign import router as campaign_router
 
-app = FastAPI(title="YZTA-Hackathon Operasyon Merkezi")
-app.include_router(campaign_router)
+from app.api.routes.campaign import router as campaign_router
+from app.api.routes.stock_risk import router as stock_risk_router
+
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="YZTA Smart Retail API",
+    version="2.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def get_db():
@@ -22,6 +38,10 @@ def get_db():
         db.close()
 
 
+app.include_router(campaign_router)
+app.include_router(stock_risk_router)
+
+
 class OrderItemCreate(BaseModel):
     product_id: int
     quantity: int
@@ -30,6 +50,16 @@ class OrderItemCreate(BaseModel):
 class OrderCreate(BaseModel):
     user_id: int
     items: List[OrderItemCreate]
+
+
+@app.get("/")
+def root():
+    return {
+        "message": "YZTA Smart Retail API running",
+        "docs": "/docs",
+        "campaign_agent": "/campaign/recommend",
+        "stock_risk_agent": "/stock-risk/analyze"
+    }
 
 
 @app.get("/inventory/", tags=["Envanter"])
@@ -161,5 +191,5 @@ async def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_order)
     return {
-        "message": f"Sipariş başarıyla oluşturuldu, Sipariş numarası: {new_order.id}"
+        "message": f"Sipariş başarıyla oluşturuldu. Sipariş no: {new_order.id}"
     }
