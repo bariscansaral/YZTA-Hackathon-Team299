@@ -55,25 +55,45 @@ def seed_users(db):
 
 
 def seed_products(db):
-    products = [
-        Product(name="Anzer Balı", sku="BAL-001", stock=50, price=1200),
-        Product(name="Kars Kaşarı", sku="PEY-002", stock=30, price=450),
-        Product(name="Siyez Unu", sku="TAH-003", stock=100, price=80),
-        Product(name="Erzincan Tulumu", sku="PEY-004", stock=25, price=380),
-        Product(name="Rize Çayı", sku="CAY-005", stock=200, price=150),
-        Product(name="Afyon Sucuğu", sku="ET-006", stock=40, price=650),
-        Product(name="Gemlik Zeytini", sku="ZEY-007", stock=120, price=220),
-        Product(name="Datça Bademi", sku="KUR-008", stock=60, price=550),
-        Product(name="Isparta Gül Reçeli", sku="REC-009", stock=45, price=120),
-        Product(name="Maraş Tarhanası", sku="COR-010", stock=85, price=180),
-    ]
-    for i in range(11, 41):
-        products.append(Product(
-            name=f"Yerel Kooperatif Ürünü {i}",
-            sku=f"KOP-{i:03d}",
-            stock=random.randint(20, 150),
-            price=random.randint(40, 900)
-        ))
+
+    categories = {
+        "PEY": ["Kars Kaşarı", "Erzincan Tulumu", "İzmir Tulumu", "Çeçil Peyniri", "Lor Peyniri", "Köy Peyniri",
+                "Süzme Peynir", "Çökelek"],
+        "YOG": ["Süzme Yoğurt", "Manda Yoğurdu", "Meyveli Yoğurt", "Keçi Yoğurdu"],
+        "SUT": ["Tam Yağlı Süt", "Yarım Yağlı Süt", "Laktozsuz Süt", "Süt Yağı"],
+        "YAG": ["Yayık Tereyağı", "Vakfıkebir Tereyağı", "Köy Tereyağı", "Tuzlu Tereyağı", "Sade Yağ"],
+        "DON": ["Maraş Dondurması", "Vanilyalı Dondurma", "Kakaolu Dondurma"],
+        "AYR": ["Naneli Ayran", "Sade Ayran", "Fesleğenli Ayran", "Pastörize Ayran"],
+        "DRK": ["Kefir", "Kımız"]  # İçecek/Diğer grubu
+    }
+
+    products = []
+
+    for prefix, names in categories.items():
+        for i, name in enumerate(names, start=1):
+
+            sku_code = f"{prefix}-{i:03d}"
+
+            # TEST SENARYOLARI (Stock Risk ve Campaign Agentları için)
+            # Peynirleri (PEY) Kritik Stok yapalım (Düşük Stok)
+            if prefix == "PEY":
+                stock = random.randint(2, 10)
+                price = random.randint(250, 600)
+            # Yağları (YAG) Overstock yapalım (Yüksek Stok)
+            elif prefix == "YAG":
+                stock = random.randint(600, 1000)
+                price = random.randint(150, 400)
+            # Geri kalanlar normal/dengeli
+            else:
+                stock = random.randint(40, 150)
+                price = random.randint(40, 200)
+
+            products.append(Product(
+                name=name,
+                sku=sku_code,
+                stock=stock,
+                price=price
+            ))
 
     db.add_all(products)
     db.flush()
@@ -125,7 +145,7 @@ def seed():
         seed_orders(db)
 
         db.commit()
-        print(f" MANUAL Mod: Veritabanı temizlendi ve 40 ürün + 4 farklı tipte siparişle dolduruldu.")
+        print(f" MANUAL Mod: Veritabanı temizlendi farklı tipte siparişler dolduruldu.")
     except Exception as e:
         db.rollback()
         print(f"Hata: {e}")

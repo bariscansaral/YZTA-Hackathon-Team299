@@ -19,6 +19,7 @@ class CampaignByProductRequest(BaseModel):
 class CampaignResponse(BaseModel):
     product_id: str
     product_name: str
+    current_stock: int
     action: str
     suggested_discount_percent: int
     suggested_price: float

@@ -109,6 +109,7 @@ def generate_campaign_recommendation(
     return CampaignResponse(
         product_id=payload.product_id,
         product_name=payload.product_name,
+        current_stock=payload.current_stock,
         action=action,
         suggested_discount_percent=suggested_discount,
         suggested_price=suggested_price,
