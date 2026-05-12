@@ -1,5 +1,5 @@
 import os
-
+import google.generativeai as genai
 
 def generate_llm_explanation(
     product_name: str,
@@ -11,40 +11,35 @@ def generate_llm_explanation(
     campaign_type: str,
     fallback_text: str,
 ) -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY")
 
     if not api_key:
         return fallback_text
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=api_key)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-3.1-flash-lite")
 
         prompt = f"""
-You are a retail campaign recommendation assistant.
+                        Sen bir kıdemli perakende analistisin. Verilen verilere dayanarak kısa bir yönetici özeti yaz.
 
-Product: {product_name}
-Recommended action: {action}
-Reason: {reason_code}
-Current stock: {current_stock}
-Predicted demand: {predicted_demand}
-Discount: %{suggested_discount_percent}
-Campaign type: {campaign_type}
+                        VERİLER:
+                        - Ürün: {product_name}
+                        - Mevcut Stok: {current_stock}
+                        - Tahmin Edilen Talep: {predicted_demand}
+                        - Önerilen Aksiyon: {action} (Neden: {reason_code})
+                        - Kampanya: %{suggested_discount_percent} indirimli {campaign_type}
 
-Explain this recommendation in 2 short business sentences.
-"""
+                        ANALİZ KURALLARI:
+                        1. Mutlaka rakamları ({current_stock} vs {predicted_demand}) birbiriyle kıyasla.
+                        2. {action} aksiyonunun neden mantıklı olduğunu {reason_code} koduna atıfta bulunarak açıkla.
+                        3. {campaign_type} kampanyasının bu stok/talep dengesine etkisini yorumla.
+                        4. Maksimum 5 profesyonel cümle kur.
+                        """
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a business analytics assistant."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.7,
-        )
+        response = model.generate_content(prompt)
+        return response.text.strip()
 
-        return response.choices[0].message.content
-
-    except Exception:
+    except Exception as e:
+        print(f"Explainer Hatası: {e}")
         return fallback_text

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime
 from app.database import Base
 
 class User(Base):
@@ -10,3 +10,4 @@ class User(Base):
     email=Column(String, nullable=False, unique=True)
     password=Column(String, nullable=False)
     role= Column(String, default="user") #admin/user
+    last_order_date = Column(DateTime, nullable=True)

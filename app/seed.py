@@ -20,16 +20,20 @@ from app.models.user import User
 from app.models.product import Product
 from app.models.order import Order
 from app.models.order_item import OrderItem
+from datetime import datetime, timedelta
 
 MODE="MANUAL" #dirty & clean
 
 def seed_users(db):
+    now = datetime.now()
     users = [
         User(name="Admin", surname="System", email="admin@test.com", password="1234", role="admin"),
-        User(name="Barışcan", surname="Saral", email="bariscan@test.com", password="yzta55123", role="admin"),
-        User(name="Ali", surname="Veli", email="ali@test.com", password="4321", role="user"),
-        User(name="Ayse",surname="Yilmaz", email="ayse@test.com", password="1234", role="user"),
-        User(name="Mehmet",surname="Kaya", email="mehmet@test.com", password="4321", role="user"),
+        User(name="Barışcan", surname="Saral", email="bariscan@test.com", password="yzta55123", role="admin",last_order_date=now),
+        User(name="Ali", surname="Veli", email="ali@test.com", password="4321", role="user",last_order_date=now - timedelta(hours=2)),
+        User(name="Ayse",surname="Yilmaz", email="ayse@test.com", password="1234", role="user",last_order_date=now - timedelta(days=120)),
+        User(name="Mehmet",surname="Kaya", email="mehmet@test.com", password="4321", role="user",last_order_date=None),
+        User(name="Can",surname="Aksoy",email="can@test.com", password="1234", role="user",last_order_date=datetime(2026, 1, 15, 14, 30)),
+        User(name="Zeynep",surname="Yılmaz",email="zeynep@test.com",password="1234", role="user",last_order_date=datetime(2025, 11, 20, 10, 0)),
     ]
 
     db.add_all(users)

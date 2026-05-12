@@ -2,13 +2,15 @@ import pickle
 import pandas as pd
 import os
 import numpy as np
+import random
 from datetime import datetime
 from crewai.tools import tool
 
 
-MODEL_PATH = "../../ml_module/exports/team299_lightgbm_final.pkl"
-print(f"DEBUG: Mevcut çalışma dizini: {os.getcwd()}")
-print(f"DEBUG: Aranan Model Yolu: {MODEL_PATH}")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+MODEL_PATH = os.path.join(BASE_DIR, "ml_module", "exports", "team299_lgbm_final.pkl")
+DATA_PATH = os.path.join(BASE_DIR, "ml_module", "data", "retail_sales_kaggle", "train.csv")
+
 
 try:
     with open(MODEL_PATH, "rb") as f:
@@ -17,20 +19,45 @@ try:
     scaler = model_pack['scaler']
     ohe = model_pack['ohe']
     features = model_pack['features']
-
+    # Eğitim scriptindeki mapping_dict'i direkt pkl içinden alıyoruz
+    mapping_dict = model_pack['mapping']
 except Exception as e:
-    print(f"Model yüklenirken hata: {e}")
+    print(f"HATA: Model veya mapping yüklenemedi: {e}")
 
 
 @tool("sales_forecast_tool")
 def sales_forecast_tool(product_name: str, forecast_date: str):
     """
-        Belirli bir ürün ve tarih için satış tahmini yapar.
-        Girdi olarak ürün adını ve tarihi alır, tahmin edilen satış miktarını döner.
+    Belirli bir ürün ve tarih için satış tahmini yapar.
+    Ürünün geçmiş satış verilerini (lag) otomatik hesaplar ve modele besler.
     """
     try:
         date_obj = datetime.strptime(forecast_date, '%Y-%m-%d')
 
+        # 1. MAPPING ÜZERİNDEN ITEM ID BULMA
+        # Product Name'den orijinal 'item' id'sine geri dön
+        reverse_mapping = {v: k for k, v in mapping_dict.items()}
+        target_item_id = reverse_mapping.get(product_name)
+
+        if target_item_id is None:
+            return f"Hata: '{product_name}' ürünü geçerli ürün listesinde bulunamadı."
+
+        # 2. VERİDEN LAG DEĞERLERİNİ HESAPLAMA
+        df_raw = pd.read_csv(DATA_PATH)
+        # Sadece ilgili ürünün geçmiş satışlarını al
+        item_sales = df_raw[df_raw['item'] == target_item_id].sort_values('date')['sales'].tolist()
+
+        if not item_sales:
+            return f"Hata: '{product_name}' için geçmiş satış verisi bulunamadı."
+
+        # Modelin beklediği lag değerlerini oluştur
+        last_val = item_sales[-1]
+        lag_1 = item_sales[-1] if len(item_sales) >= 1 else last_val
+        lag_7 = item_sales[-7] if len(item_sales) >= 7 else last_val
+        lag_30 = item_sales[-30] if len(item_sales) >= 30 else last_val
+        roll_mean_7 = np.mean(item_sales[-7:]) if len(item_sales) >= 7 else last_val
+
+        # 3. ZAMAN VE LAG ÖZELLİKLERİNİ OLUŞTURMA
         data = {
             'month': [date_obj.month],
             'day_of_month': [date_obj.day],
@@ -40,31 +67,42 @@ def sales_forecast_tool(product_name: str, forecast_date: str):
             'year': [date_obj.year],
             'is_weekend': [1 if date_obj.weekday() >= 5 else 0],
             'is_month_start': [1 if date_obj.day == 1 else 0],
-            'is_month_end': [1 if (date_obj.day == pd.Period(date_obj, freq='D').days_in_month) else 0]
+            'is_month_end': [1 if (date_obj.day == pd.Period(date_obj, freq='D').days_in_month) else 0],
+            'sales_lag_1': [float(lag_1)],
+            'sales_lag_7': [float(lag_7)],
+            'sales_lag_30': [float(lag_30)],
+            'sales_roll_mean_7': [float(roll_mean_7)]
         }
+        X_df = pd.DataFrame(data)
 
-        df = pd.DataFrame(data)
-
-
-        ohe_out = ohe.transform([[product_name]])
+        # 4. ONE-HOT ENCODING (PRODUCT NAME)
+        product_df = pd.DataFrame([[product_name]], columns=['Product Name'])
+        ohe_out = ohe.transform(product_df)
         ohe_cols = ohe.get_feature_names_out(['Product Name'])
         df_ohe = pd.DataFrame(ohe_out, columns=ohe_cols)
 
+        # 5. BİRLEŞTİRME VE ÖLÇEKLENDİRME
+        X_final = pd.concat([X_df, df_ohe], axis=1)
 
-        X_final = pd.concat([df, df_ohe], axis=1)
-
-
+        # Eğitimdeki sütun sırasıyla eşleştiğinden emin ol (Eksikleri 0 yap)
         for col in features:
             if col not in X_final.columns:
                 X_final[col] = 0
-
         X_final = X_final[features]
 
-
+        # Scaler uygulama
         X_scaled = scaler.transform(X_final)
-        prediction = model.predict(X_scaled)
+        # Sütun isimli DataFrame olarak modele ver (Warning almamak için)
+        X_scaled_df = pd.DataFrame(X_scaled, columns=features)
 
-        return f"{product_name} için {forecast_date} tarihinde beklenen satış: {round(prediction[0], 2)} adet."
+        # TAHMİN
+        prediction = model.predict(X_scaled_df)
+        res = round(prediction[0], 2)
+
+        return (
+            f"'{product_name}' için {forecast_date} tarihindeki tahmin: {res} adet.\n"
+            f"Analiz Detayı: Son satış: {lag_1}, 7 günlük ortalama trend: {round(roll_mean_7, 2)}."
+        )
+
     except Exception as e:
-        return f"Tahmin sırasında hata oluştu: {str(e)}"
-
+        return f"Tahmin hatası: {str(e)}"
