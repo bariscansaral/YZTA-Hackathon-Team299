@@ -1,4 +1,4 @@
-from crewai.tools import tool
+from crewai_tools import tool
 import sys
 from pathlib import Path
 root_dir = Path(__file__).resolve().parent.parent.parent

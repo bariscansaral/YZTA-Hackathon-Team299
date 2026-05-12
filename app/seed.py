@@ -38,26 +38,6 @@ def seed_users(db):
 
     db.add_all(users)
 
-"""def seed_products(db):
-    products = []
-    for i in range(1,31):
-        if MODE=="DIRTY":
-            products.append(Product(
-                name="UNKNOWN" if random.random() < 0.3 else f"Product {i}",
-                sku=None if random.random() < 0.5 else f"prd-{i}",
-                stock=-10 if random.random() < 0.4 else None,
-                price=None if random.random() < 0.5 else random.randint(10, 2000)
-            ))
-        else:
-            products.append(Product(
-                name=f"Product {i}",
-                sku=f"PRD-{i:04d}",
-                stock=random.randint(1,100),
-                price=random.randint(1,100)
-            ))
-    db.add_all(products)"""
-
-
 def seed_products(db):
 
     categories = {
@@ -78,16 +58,15 @@ def seed_products(db):
 
             sku_code = f"{prefix}-{i:03d}"
 
-            # TEST SENARYOLARI (Stock Risk ve Campaign Agentları için)
-            # Peynirleri (PEY) Kritik Stok yapalım (Düşük Stok)
+
             if prefix == "PEY":
                 stock = random.randint(2, 10)
                 price = random.randint(250, 600)
-            # Yağları (YAG) Overstock yapalım (Yüksek Stok)
+
             elif prefix == "YAG":
                 stock = random.randint(600, 1000)
                 price = random.randint(150, 400)
-            # Geri kalanlar normal/dengeli
+
             else:
                 stock = random.randint(40, 150)
                 price = random.randint(40, 200)
@@ -108,30 +87,30 @@ def seed_orders(db):
     db.add(o1)
     db.flush()
     db.add_all([
-        OrderItem(order_id=o1.id, product_id=1, quantity=1),  # Anzer Balı
-        OrderItem(order_id=o1.id, product_id=5, quantity=2)  # Rize Çayı
+        OrderItem(order_id=o1.id, product_id=1, quantity=1),
+        OrderItem(order_id=o1.id, product_id=5, quantity=2)
     ])
 
     o2 = Order(user_id=3, status="Hazırlanıyor")
     db.add(o2)
     db.flush()
     db.add_all([
-        OrderItem(order_id=o2.id, product_id=6, quantity=1),  # Sucuk
-        OrderItem(order_id=o2.id, product_id=2, quantity=1)  # Kaşar
+        OrderItem(order_id=o2.id, product_id=6, quantity=1),
+        OrderItem(order_id=o2.id, product_id=2, quantity=1)
     ])
 
     o3 = Order(user_id=4, status="Tamamlandı")
     db.add(o3)
     db.flush()
     db.add_all([
-        OrderItem(order_id=o3.id, product_id=3, quantity=5)  # Siyez Unu
+        OrderItem(order_id=o3.id, product_id=3, quantity=5)
     ])
 
     o4 = Order(user_id=2, status="Beklemede")
     db.add(o4)
     db.flush()
     db.add_all([
-        OrderItem(order_id=o4.id, product_id=4, quantity=20)  # 25 stoktan 20'sini çekiyor
+        OrderItem(order_id=o4.id, product_id=4, quantity=20) 
     ])
 
 

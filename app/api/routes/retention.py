@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.database import SessionLocal
 from app.schemas.retention import RetentionAnalyzeResponse
-from app.agents.retention_agent import RetentionAgent
+from app.services.retention_agent import RetentionAgent
 
 router = APIRouter(prefix="/retention", tags=["Retention Agent"])
 
