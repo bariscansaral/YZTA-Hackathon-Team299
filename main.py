@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
+from datetime import datetime
 
 from app.database import Base, engine, SessionLocal
 from app.models.user import User
@@ -13,6 +14,8 @@ from app.models.order_item import OrderItem
 from app.api.routes.campaign import router as campaign_router
 from app.api.routes.stock_risk import router as stock_risk_router
 from app.api.routes.fraud import router as fraud_router
+
+from app.api.routes.retention import router as retention_router
 
 
 Base.metadata.create_all(bind=engine)
@@ -42,6 +45,8 @@ def get_db():
 app.include_router(campaign_router)
 app.include_router(stock_risk_router)
 app.include_router(fraud_router)
+
+app.include_router(retention_router)
 
 
 class OrderItemCreate(BaseModel):
@@ -107,6 +112,7 @@ async def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
         )
         product.stock -= item.quantity
         db.add(order_item)
+    user.last_order_date = datetime.now()
 
     db.commit()
     db.refresh(new_order)
