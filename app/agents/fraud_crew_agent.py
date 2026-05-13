@@ -25,23 +25,21 @@ fraud_inspector_agent = Agent(
     allow_delegation=False
 )
 
-fraud_check_task = Task(
-    description="""
-    Sistemdeki son siparişleri ve '{product_name}' ile ilgili yapılan işlem geçmişini incele. 
-    1. Belirtilen order_id veya kullanıcı geçmişindeki anormallikleri tespit etmek için fraud_analysis_tool'u kullan.
-    2. Sipariş tutarı, ürün adedi ve kullanıcı güven puanı arasındaki tutarsızlıkları 2 cümleyle raporla.
-    3. Eğer yüksek riskli bir durum varsa, admin için acil eylem planı (bloklama veya manuel inceleme) öner.
-    """,
-    expected_output="""
-    Siparişin risk skorunu, tespit edilen şüpheli örüntüleri ve alınması gereken 
-    aksiyonu içeren 4 cümlelik güvenlik raporu.
-    """,
+fraud_task = Task(
+    description=(
+        "Sistem genelindeki tüm kullanıcı hareketlerini ve siparişleri analiz et.\n"
+        "1. Birden fazla hesaptan gelen şüpheli siparişleri kontrol et.\n"
+        "2. Stok seviyeleri ile sipariş adetleri arasındaki tutarsızlıkları bul.\n"
+        "3. Yüksek tutarlı veya anormal sıklıktaki işlemleri raporla.\n"
+        "DİKKAT: Analizini tek bir kullanıcıyla sınırlama, tüm veritabanı genelinde bir risk raporu hazırla."
+    ),
+    expected_output="Tüm sistemi kapsayan, riskli kullanıcıları ve şüpheli işlemleri listeleyen güvenlik raporu.",
     agent=fraud_inspector_agent
 )
 
 fraud_crew = Crew(
     agents=[fraud_inspector_agent],
-    tasks=[fraud_check_task],
+    tasks=[fraud_task],
     process=Process.sequential,
     verbose=True,
     max_rpm=10

@@ -147,3 +147,27 @@ def analyze_fraud_risk(payload: FraudRequest, source: str = "manual_input") -> F
         recommended_actions=recommended_actions,
         source=source,
     )
+
+
+def analyze_all_orders_for_fraud(db: Session):
+    """Veritabanındaki son siparişleri topluca analiz eder."""
+    orders = db.query(Order).order_by(Order.created_at.desc()).limit(50).all()
+
+    global_report = []
+    for order in orders:
+        try:
+            payload = build_fraud_request_from_order_id(db, order.id)
+            analysis = analyze_fraud_risk(payload, source="global_scanner")
+
+            if analysis.fraud_score >= 0.25:
+                global_report.append({
+                    "order_id": order.id,
+                    "user_id": order.user_id,
+                    "risk": analysis.fraud_risk_level,
+                    "score": analysis.fraud_score,
+                    "reasons": analysis.reason_codes
+                })
+        except Exception:
+            continue
+
+    return global_report

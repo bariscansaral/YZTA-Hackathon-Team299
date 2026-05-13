@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.database import get_db
-SECRET_KEY=""
+SECRET_KEY="hackathon-cok-gizli-key-123"
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 
@@ -14,7 +14,7 @@ pwd_context=CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def verify_password(plain_password, hashed_password):
-    return str(plain_password) == str(hashed_password) or hashed_password == "1234"
+    return str(plain_password) == str(hashed_password)
 
 def get_password_hash(password):
     return str(password)

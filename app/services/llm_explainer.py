@@ -20,22 +20,23 @@ def generate_llm_explanation(
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel("gemini-3.1-flash-lite")
 
-        prompt = f"""
-                        Sen bir kıdemli perakende analistisin. Verilen verilere dayanarak kısa bir yönetici özeti yaz.
 
-                        VERİLER:
-                        - Ürün: {product_name}
-                        - Mevcut Stok: {current_stock}
-                        - Tahmin Edilen Talep: {predicted_demand}
-                        - Önerilen Aksiyon: {action} (Neden: {reason_code})
-                        - Kampanya: %{suggested_discount_percent} indirimli {campaign_type}
+        prompt = f"""Sen kıdemli bir perakende analistisin. 
+        SADECE aşağıdaki verileri kullanarak profesyonel bir özet yaz.
 
-                        ANALİZ KURALLARI:
-                        1. Mutlaka rakamları ({current_stock} vs {predicted_demand}) birbiriyle kıyasla.
-                        2. {action} aksiyonunun neden mantıklı olduğunu {reason_code} koduna atıfta bulunarak açıkla.
-                        3. {campaign_type} kampanyasının bu stok/talep dengesine etkisini yorumla.
-                        4. Maksimum 5 profesyonel cümle kur.
-                        """
+        VERİLER:
+        Ürün: {product_name}
+        Mevcut Stok: {current_stock}
+        Tahmin Edilen Talep: {predicted_demand}
+        Önerilen Aksiyon: {action}
+        Neden Kodu: {reason_code}
+        Kampanya: %{suggested_discount_percent} indirim ({campaign_type})
+
+        KURALLAR:
+        1. Mevcut stok olan {current_stock} ile tahmini talep olan {predicted_demand} rakamlarını KESİNLİKLE kullan.
+        2. Başka yerden sayı uydurma.
+        3. Maksimum 4 cümle.
+        """
 
         response = model.generate_content(prompt)
         return response.text.strip()

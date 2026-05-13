@@ -6,6 +6,7 @@ from sqlalchemy import func
 from typing import List
 from pydantic import BaseModel, Field
 from datetime import datetime, date, timedelta
+import re
 
 from app import auth
 from app.database import Base, engine, SessionLocal
@@ -111,74 +112,88 @@ async def chat_support(current_user: User = Depends(auth.get_current_user)):
 
 
 @app.post("/chat/forecast", tags=["Chatbot"], dependencies=[Depends(auth.admin_only)])
-async def chat_forecast(request: ChatRequest):
+async def chat_forecast(request: ChatRequest, db: Session = Depends(get_db)):
+    raw_text = request.product_name.strip()
+    lower_text = raw_text.lower()
+    numbers = re.findall(r'\d+', lower_text)
+    threshold = int(numbers[0]) if numbers else None
+    if any(word in lower_text for word in ["stok", "fazla", "listele", "limit"]):
+        if threshold is not None:
+            products = db.query(Product).filter(Product.stock >= threshold).all()
+            print(f"DİNAMİK FİLTRE: {threshold} ve üzeri stoklar aranıyor...")
+        else:
+            products = db.query(Product).filter(Product.stock >= 50).all()
 
-    target = request.target_date if request.target_date else date.today().isoformat()
+        if products:
+            product_list_str = "\n".join([f"- {p.name}: {p.stock} adet" for p in products])
+            inputs = {
+                'product': f"Şu kriterdeki ürünlerin listesi: {product_list_str}",
+                'current_stock': f"{threshold if threshold else 50} limitine göre filtrelendi.",
+                'date': request.target_date or date.today().isoformat()
+            }
+            result = oracle_crew.kickoff(inputs=inputs)
+            return {"ai_chat_reply": result.raw if hasattr(result, 'raw') else str(result)}
+        else:
+            return {"ai_chat_reply": f"{threshold} stok miktarının üzerinde hiçbir ürün bulunamadı."}
+    product_obj = db.query(Product).filter(
+        func.lower(Product.name).like(f"%{lower_text}%")
+    ).first()
+
+    if not product_obj:
+        return {"ai_chat_reply": f"'{raw_text}' için bir ürün veya geçerli bir stok limiti bulamadım."}
+
     inputs = {
-        'product': request.product_name,
-        'date': target
+        'product': product_obj.name,
+        'current_stock': int(product_obj.stock),
+        'date': request.target_date or date.today().isoformat()
     }
     result = oracle_crew.kickoff(inputs=inputs)
     return {"ai_chat_reply": result.raw if hasattr(result, 'raw') else str(result)}
 
 
 
-@app.post("/chat/security", tags=["Chatbot"], dependencies=[Depends(auth.admin_only)])
-async def chat_security(request: ChatRequest):
-
-    inputs = {
-        'product_name': request.product_name,
-        'order_id': "SİSTEM_GENEL"
-    }
-    result = fraud_crew.kickoff(inputs=inputs)
-    return {"ai_chat_reply": result.raw}
-
-
-
 @app.post("/chat/marketing", tags=["Chatbot"], dependencies=[Depends(auth.admin_only)])
 async def chat_marketing(request: ChatRequest, db: Session = Depends(get_db)):
-    product_obj = db.query(Product).filter(Product.name == request.product_name).first()
+    product_obj = db.query(Product).filter(
+        func.lower(Product.name).like(f"%{request.product_name.lower()}%")
+    ).first()
+
     if not product_obj:
-        raise HTTPException(status_code=404, detail="Ürün bulunamadı.")
+        return {"ai_chat_reply": f"Üzgünüm, '{request.product_name}' isimli ürün envanterde bulunamadı. Lütfen listeden geçerli bir ürün seçin."}
 
     now = datetime.now()
-    seven_days_ago = now - timedelta(days=7)
-    thirty_days_ago = now - timedelta(days=30)
-
-    recent_sales_7d = db.query(OrderItem).join(Order).filter(
+    sales_30d = db.query(OrderItem).join(Order).filter(
         OrderItem.product_id == product_obj.id,
-        Order.created_at >= seven_days_ago
+        Order.created_at >= (now - timedelta(days=30))
     ).with_entities(func.sum(OrderItem.quantity)).scalar() or 0
-
-    recent_sales_30d = db.query(OrderItem).join(Order).filter(
-        OrderItem.product_id == product_obj.id,
-        Order.created_at >= thirty_days_ago
-    ).with_entities(func.sum(OrderItem.quantity)).scalar() or 0
-
 
     inputs = {
         'product_id': str(product_obj.id),
         'product_name': product_obj.name,
-        'current_stock': product_obj.stock,
-        'current_price': getattr(product_obj, 'price', 150.0),
-        'recent_sales_7d': int(recent_sales_7d),
-        'recent_sales_30d': int(recent_sales_30d),
+        'current_stock': int(product_obj.stock),
+        'current_price': float(getattr(product_obj, 'price', 150.0)),
+        'recent_sales_30d': int(sales_30d),
         'date': request.target_date or date.today().isoformat()
     }
 
+    try:
+        result = marketing_crew.kickoff(inputs=inputs)
+        return {"ai_chat_reply": result.raw if hasattr(result, 'raw') else str(result)}
+    except Exception as e:
+        return {"ai_chat_reply": "Analiz sırasında bir teknik aksaklık oluştu, ancak stok verilerine göre strateji hazır."}
 
-    result = marketing_crew.kickoff(inputs=inputs)
 
-    return {
-        "status": "Success",
-        "meta_data": {
-            "calculated_stats": {
-                "7d_sales": recent_sales_7d,
-                "30d_sales": recent_sales_30d
-            }
-        },
-        "ai_chat_reply": result.raw if hasattr(result, 'raw') else str(result)
+@app.post("/chat/fraud", tags=["Chatbot"], dependencies=[Depends(auth.admin_only)])
+async def chat_fraud(db: Session = Depends(get_db)):
+
+    recent_orders = db.query(Order).order_by(Order.created_at.desc()).limit(20).all()
+    agent_inputs = {
+        'analysis_scope': "Tüm sistem ve son 24 saatlik işlemler",
+        'total_orders_to_check': len(recent_orders),
+        'timestamp': datetime.now().isoformat()
     }
+    result = fraud_crew.kickoff(inputs=agent_inputs)
+    return {"ai_chat_reply": result.raw if hasattr(result, 'raw') else str(result)}
 
 
 

@@ -21,28 +21,23 @@ llm_model = ChatGoogleGenerativeAI(
 
 oracle_agent = Agent(
     role='Stratejik Satış Tahmincisi',
-    goal='{product} ürünü için {date} tarihindeki satış tahminini raporla, Raporda mutlaka tooldan gelen sayısal veriyi kullan ve X gibi ifadeler bırakma strategic_explanation_tooldan gelen stratejik yorumu raporun sonuç kısmına aynen ekle.',
-    backstory='Sen bir veri bilimcisi ve satış stratejistisin, tahmin yaparken sadece haftanın günlerine değil; resmi tatillere, '
-              'dini bayramlara ve Anneler Günü gibi özel ticari dönemlere karşı aşırı duyarlısın, Rakamları bulduktan sonra strategic_explanation_tool kullanarak yönetici özeti hazırlarsın.',
+    goal='{product} ürünü için {date} tarihindeki satış tahminini raporla. Mevcut stok verisi: {current_stock}.', # Stok verisini buraya da gömdük
+    backstory='Sen bir veri bilimcisisin. Sana verilen gerçek stok verisi olan {current_stock} rakamına sadık kalmalısın.',
     llm=llm_model,
-    tools=[sales_forecast_tool,strategic_explanation_tool],
+    tools=[sales_forecast_tool, strategic_explanation_tool],
     verbose=True,
     allow_delegation=False
 )
 
-
 forecast_task = Task(
     description=(
-        "{product} ürünü için {date} tarihinde satış tahmini yap. "
-        "ÖNCE sales_forecast_tool ile {product} için {date} tarihindeki rakamı bul.\n"
-        "2. BU RAKAMI AL VE MUTLAKA strategic_explanation_tool aracına gönder. Bu adımı atlama!\n"
-        "3. BU ARACIN (strategic_explanation_tool) ÜRETTİĞİ profesyonel açıklamayı raporunun 'Stratejik Analiz' bölümüne kelimesi kelimesine ekle.\n"
-        "4. Final raporunda hem ham tahmin rakamını (86.96 gibi) hem de bu tool'dan gelen resmi açıklamayı kullan."
+        "1. sales_forecast_tool ile {product} için {date} tahmini rakamını bul.\n"
+        "2. strategic_explanation_tool'u kullanırken ona gerçek stok miktarını ({current_stock}) da parametre olarak ver.\n"
+        "3. Eğer tool sana yanlış bir stok (100 gibi) döndürürse, o kısmı raporunda GERÇEK STOK ({current_stock}) ile düzelt."
     ),
-    expected_output="predict_tool'dan gelen ML tahmini ve strategic_explanation_tool'dan gelen resmi analizi içeren 3 cümlelik rapor.",
+    expected_output="ML tahmini ve {current_stock} stok verisine dayalı rapor.",
     agent=oracle_agent
 )
-
 
 oracle_crew = Crew(
     agents=[oracle_agent],

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import "./App.css";
 
+const API_URL = "http://localhost:8000";
+
 const pages = {
   overview: "Genel Bakış",
   stock: "Stok Yönetimi",
@@ -66,32 +68,136 @@ const data = {
   ],
 };
 
+const productList = [
+  "Kars Kaşarı", "Erzincan Tulumu", "İzmir Tulumu", "Çeçil Peyniri", "Süzme Yoğurt",
+  "Manda Yoğurdu", "Meyveli Yoğurt", "Keçi Yoğurdu", "Tam Yağlı Süt", "Yarım Yağlı Süt",
+  "Laktozsuz Süt", "Yayık Tereyağı", "Vakfıkebir Tereyağı", "Köy Tereyağı", "Tuzlu Tereyağı",
+  "Maraş Dondurması", "Vanilyalı Dondurma", "Kakaolu Dondurma", "Sade Yağ", "Süt Yağı",
+  "Naneli Ayran", "Sade Ayran", "Fesleğenli Ayran", "Lor Peyniri", "Köy Peyniri",
+  "Süzme Peynir", "Çökelek", "Kefir", "Pastörize Ayran", "Kımız"
+];
+
+const extractDate = (text) => {
+  const dateRegex = /(\d{2})[./-](\d{2})[./-](\d{4})/;
+  const match = text.match(dateRegex);
+  if (match) {
+    return `${match[3]}-${match[2]}-${match[1]}`;
+  }
+  return new Date().toISOString().split('T')[0];
+};
+
 function App() {
   const [activePage, setActivePage] = useState("overview");
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      text: "Merhaba 👋 Ben KOBİ AI Asistanınız. Sipariş, stok, kargo ve müşteri taleplerini tek ekrandan yönetmenize yardımcı olurum.",
-    },
-  ]);
+  const [messages, setMessages] = useState([{ role: "assistant", text: "Merhaba 👋 Ben KOBİ AI Asistanınız. Nasıl yardımcı olabilirim?" }]);
   const [input, setInput] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [token, setToken] = useState("");
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
 
-  const sendMessage = (customText) => {
-    const text = customText || input;
-    if (!text.trim()) return;
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const formData = new URLSearchParams();
+      formData.append('username', loginForm.email); // FastAPI 'username' bekler
+      formData.append('password', loginForm.password);
 
-    setMessages([
-      ...messages,
-      { role: "user", text },
-      {
-        role: "assistant",
-        text: `"${text}" için demo yanıt oluşturdum. Backend bağlandığında gerçek verilerle analiz yapacağım.`,
-      },
-    ]);
-    setInput("");
+      const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData
+      });
+
+      const result = await res.json();
+      if (result.access_token) {
+        setToken(result.access_token);
+        setIsLoggedIn(true);
+      } else {
+        alert("Giriş başarısız! Terminale bak hata kodu ne?");
+      }
+    } catch (err) {
+      alert("Backend bağlantı hatası!");
+    }
   };
 
-  return (
+const sendMessage = async (customText) => {
+  const text = customText || input;
+  if (!text.trim()) return;
+
+  let detectedProduct = productList.find(p =>
+    text.toLowerCase().includes(p.toLowerCase())
+  );
+
+  const targetDate = extractDate(text);
+
+  if (!detectedProduct) {
+    detectedProduct = text.split(" ").slice(0, 2).join(" ");
+  }
+
+  setMessages(prev => [
+    ...prev,
+    { role: "user", text },
+    { role: "assistant", text: `${detectedProduct} için ${targetDate} tarihi analiz ediliyor... ⏳` }
+  ]);
+  setInput("");
+
+  try {
+
+    let endpoint = "/chat/marketing";
+    const lowerText = text.toLowerCase();
+
+    if (lowerText.includes("tahmin") || lowerText.includes("satış") || lowerText.includes("ne olur") || lowerText.includes("gelecek hafta")) {
+      endpoint = "/chat/forecast";
+    } else if (lowerText.includes("fraud") || lowerText.includes("şüpheli") || lowerText.includes("güvenlik") || lowerText.includes("risk")) {
+      endpoint = "/chat/fraud";
+    } else if (lowerText.includes("kampanya") || lowerText.includes("pazarlama") || lowerText.includes("indirim")) {
+      endpoint = "/chat/marketing";
+    }
+
+    const res = await fetch(`${API_URL}${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        product_name: detectedProduct,
+        target_date: targetDate
+      })
+    });
+
+    const result = await res.json();
+    const reply = result.ai_chat_reply || "Yanıt alınamadı.";
+
+    setMessages(prev => {
+      const newMsg = [...prev];
+      newMsg[newMsg.length - 1] = { role: "assistant", text: reply };
+      return newMsg;
+    });
+
+  } catch (err) {
+    setMessages(prev => {
+      const newMsg = [...prev];
+      newMsg[newMsg.length - 1] = { role: "assistant", text: "Bağlantı hatası!" };
+      return newMsg;
+    });
+  }
+};
+
+  if (!isLoggedIn) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#fbfaf7' }}>
+        <form onSubmit={handleLogin} className="panel" style={{ padding: '30px', width: '320px', textAlign: 'center' }}>
+          <h2 style={{ color: '#f97316' }}>KOBİ Zeka Giriş</h2>
+          <input type="email" placeholder="E-posta" style={{ width: '100%', marginBottom: '10px', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} onChange={e => setLoginForm({...loginForm, email: e.target.value})} required />
+          <input type="password" placeholder="Şifre" style={{ width: '100%', marginBottom: '20px', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} onChange={e => setLoginForm({...loginForm, password: e.target.value})} required />
+          <button type="submit" className="primaryBtn" style={{ width: '100%' }}>Giriş Yap</button>
+        </form>
+      </div>
+    );
+  }
+
+
+return (
     <div className="app">
       <aside className="sidebar">
         <div className="logoCard">
