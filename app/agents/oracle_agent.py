@@ -39,24 +39,14 @@ forecast_task = Task(
         "3. BU ARACIN (strategic_explanation_tool) ÜRETTİĞİ profesyonel açıklamayı raporunun 'Stratejik Analiz' bölümüne kelimesi kelimesine ekle.\n"
         "4. Final raporunda hem ham tahmin rakamını (86.96 gibi) hem de bu tool'dan gelen resmi açıklamayı kullan."
     ),
-    expected_output="predict_tool'dan gelen ML tahmini ve strategic_explanation_tool'dan gelen resmi analizi içeren tam rapor.",
+    expected_output="predict_tool'dan gelen ML tahmini ve strategic_explanation_tool'dan gelen resmi analizi içeren 3 cümlelik rapor.",
     agent=oracle_agent
 )
 
 
-crew = Crew(
+oracle_crew = Crew(
     agents=[oracle_agent],
     tasks=[forecast_task],
     process=Process.sequential,
-    rpm_limit=10
+    max_rpm=10
 )
-
-if __name__ == "__main__":
-    result = crew.kickoff(inputs={
-        'product': 'Tuzlu Tereyağı',
-        'date': '2026-05-10'
-    })
-
-    print("\n\n########################")
-    print("AGENT SONUCU:")
-    print(result)

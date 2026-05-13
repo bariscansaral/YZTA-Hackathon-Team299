@@ -15,27 +15,29 @@ llm_model = ChatGoogleGenerativeAI(
 )
 
 gatekeeper_agent = Agent(
-    role='Akıllı Kurumsal Kapı Denetçisi ve Koordinatör',
-    goal='Kullanıcının kimliğini doğrulayarak yetkisine göre operasyonel stratejileri veya kişisel kargo bilgilerini sunmak.',
-    backstory="""Sen sistemin en üst düzey yöneticisisin. AuthorityCheckTool kullanarak gelen kişinin 
-    ADMIN mi yoksa USER mı olduğunu anlarsın. ADMIN'lere şirketin tüm mutfak bilgilerini (tahmin, hammadde, strateji) 
-    raporlarsın; USER'lara ise sadece kendi kargolarını ve onlara özel kampanyaları söylersin. 
-    Veri gizliliği senin için kırmızı çizgidir.""",
-    tools=[AuthorityCheckTool(), OrderTrackingTool()],
+    role='Akıllı Kargo ve Müşteri Destek Asistanı',
+    goal='Verilen kullanıcı mailiyle kargo sorgusu yapmak ve sonucu nazikçe bildirmek.',
+    backstory="""Sen bir asistansın. Sana sağlanan 'user_email' bilgisi, login olan 
+    kullanıcının gerçek mailidir. Bu yüzden kullanıcıya mailini sorma! 
+    Senin görevin, elindeki bu maili 'order_tracking_tool' aracına gönderip 
+    gelen sonuçları (Beklemede, Yolda vb.) müşteriye çok nazik bir dille iletmektir. 
+    Eğer tool bir hata döndürürse veya sipariş bulamazsa, bunu profesyonelce açıkla.""",
+    tools=[OrderTrackingTool()],
     llm=llm_model,
-    verbose=True
+    max_iter=3,
+    verbose=True,
+    allow_delegation=False
 )
 
 gatekeeper_task = Task(
     description=(
-        "1. Önce '{user_name}' kullanıcısının yetkisini 'AuthorityCheckTool' ile sorgula.\n"
-        "2. EĞER YETKİ 'USER' İSE:\n"
-        "   - SADECE 'OrderTrackingTool' kullan ve kargo durumunu öğren.\n"
-        "   - Çıktıyı şu formatta ver ve BAŞKA HİÇBİR ŞEY YAZMA: 'Sayın [user_name], kargonuz [durum] aşamasındadır.'\n"
-        "   - DİKKAT: USER için asla Oracle veya Supply agent'larını çağırma, analize devam etme.\n"
-        "3. EĞER YETKİ 'ADMIN' İSE: 'Yönetici onayı alındı' notuyla analize devam et."
+        "1. '{user_email}' adresini kullanarak 'order_tracking_tool'u ÇALIŞTIR.\n"
+        "2. Tool'dan gelen sipariş durumuna bak.\n"
+        "3. Eğer durum 'Beklemede' ise: 'Sayın {user_name}, kargonuz henüz hazırlanma aşamasında. Beklettiğimiz için çok özür dileriz.' de.\n"
+        "4. Eğer sipariş 'Yolda' veya 'Tamamlandı' ise durumu belirt.\n"
+        "Asla kullanıcıyla mail istemek için diyaloğa girme, doğrudan tool sonucunu raporla."
     ),
-    expected_output="Eğer kullanıcı USER ise sadece tek cümlelik kargo bilgisi. ADMIN ise tüm rapor.",
+    expected_output="Kullanıcıya özel, tool verisine dayalı kargo bilgilendirme cümlesi.",
     agent=gatekeeper_agent
 )
 

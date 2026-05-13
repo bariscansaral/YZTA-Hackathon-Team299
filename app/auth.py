@@ -19,6 +19,8 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return str(password)
 
+
+
 def create_access_token(data: dict):
     to_encode=data.copy()
     expire=datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -43,3 +45,8 @@ def  get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends
     if user is None:
         raise credentials_exception
     return user
+
+def admin_only(current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Bu işlem için admin yetkisi gerekiyor.")
+    return current_user

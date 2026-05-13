@@ -1,19 +1,3 @@
-"""
-SEED SCRIPT
-
-EN:
-This script initializes the database and fills it with sample data.
-It supports two modes:
-- CLEAN mode: valid and consistent data
-- DIRTY mode: intentionally corrupted data for AI agent testing
-
-TR:
-Bu script veritabanını oluşturur ve örnek verilerle doldurur.
-İki mod destekler:
-- CLEAN: düzgün ve tutarlı veriler
-- DIRTY: AI agent testleri için bozuk/veri hatalı kayıtlar
-"""
-
 import random
 from app.database import Base, engine, SessionLocal
 from app.models.user import User
@@ -21,6 +5,7 @@ from app.models.product import Product
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from datetime import datetime, timedelta
+from sqlalchemy import func
 
 MODE="MANUAL" #dirty & clean
 
@@ -83,35 +68,35 @@ def seed_products(db):
 
 
 def seed_orders(db):
-    o1 = Order(user_id=2, status="Beklemede")
-    db.add(o1)
-    db.flush()
-    db.add_all([
-        OrderItem(order_id=o1.id, product_id=1, quantity=1),
-        OrderItem(order_id=o1.id, product_id=5, quantity=2)
-    ])
+    now = datetime.now()
 
-    o2 = Order(user_id=3, status="Hazırlanıyor")
-    db.add(o2)
-    db.flush()
-    db.add_all([
-        OrderItem(order_id=o2.id, product_id=6, quantity=1),
-        OrderItem(order_id=o2.id, product_id=2, quantity=1)
-    ])
+    # 1. Senaryo: Son 7 günde yoğun satış (Trend analizi için)
+    for i in range(10):
+        o = Order(user_id=random.randint(3, 7), status="Tamamlandı",
+                  created_at=now - timedelta(days=random.randint(1, 6)))
+        db.add(o)
+        db.flush()
+        db.add(OrderItem(order_id=o.id, product_id=random.randint(1, 5), quantity=random.randint(1, 3)))
 
-    o3 = Order(user_id=4, status="Tamamlandı")
-    db.add(o3)
-    db.flush()
-    db.add_all([
-        OrderItem(order_id=o3.id, product_id=3, quantity=5)
-    ])
+    # 2. Senaryo: 15-30 gün önce arası satışlar (30 günlük farkı görmek için)
+    for i in range(5):
+        o = Order(user_id=random.randint(3, 7), status="Tamamlandı",
+                  created_at=now - timedelta(days=random.randint(15, 25)))
+        db.add(o)
+        db.flush()
+        db.add(OrderItem(order_id=o.id, product_id=random.randint(1, 5), quantity=random.randint(2, 5)))
 
-    o4 = Order(user_id=2, status="Beklemede")
-    db.add(o4)
+    # 3. Senaryo: Kargo/Destek Botu Testi için "Beklemede" siparişler
+    o_pending = Order(user_id=2, status="Beklemede", created_at=now - timedelta(hours=5))
+    db.add(o_pending)
     db.flush()
-    db.add_all([
-        OrderItem(order_id=o4.id, product_id=4, quantity=20) 
-    ])
+    db.add(OrderItem(order_id=o_pending.id, product_id=10, quantity=1))
+
+    # 4. Senaryo: Fraud Botu Testi için anormal büyük sipariş
+    o_fraud = Order(user_id=3, status="Hazırlanıyor", created_at=now)
+    db.add(o_fraud)
+    db.flush()
+    db.add(OrderItem(order_id=o_fraud.id, product_id=12, quantity=100))
 
 
 def seed():
